@@ -152,6 +152,23 @@ export default function Home() {
     intentar()
   }
 
+  function subirAlBus() {
+    if (!reporteActivo || !rutaSeleccionada) return
+    const actualizado: Reporte = {
+      ...reporteActivo,
+      tipo: "en_bus",
+      timestamp: Date.now(),
+    }
+    const todos: Reporte[] = JSON.parse(localStorage.getItem(REPORTES_KEY) ?? "[]")
+    const actualizados = todos.map(r => r.id === actualizado.id ? actualizado : r)
+    localStorage.setItem(REPORTES_KEY, JSON.stringify(actualizados))
+    localStorage.setItem(REPORTE_KEY, JSON.stringify(actualizado))
+    setReporteActivo(actualizado)
+    setModo("en_bus")
+    setConfirmacionVisible(true)
+    setTimeout(() => setConfirmacionVisible(false), 2000)
+  }
+
   function cancelarReporte() {
     localStorage.removeItem(REPORTE_KEY)
     setReporteActivo(null)
@@ -191,40 +208,44 @@ export default function Home() {
     ]
     const paso = pasos[onboardingPaso]
     return (
-      <main className="h-full bg-zinc-950 text-white flex flex-col items-center justify-center px-8 text-center">
-        <div className="text-5xl mb-6">{paso.emoji}</div>
-        <h1 className="text-2xl font-bold mb-3">{paso.titulo}</h1>
-        <p className="text-zinc-400 text-sm leading-relaxed mb-10">{paso.texto}</p>
-        <div className="flex gap-2 mb-8">
-          {pasos.map((_, i) => (
-            <div key={i} className={`w-2 h-2 rounded-full ${i === onboardingPaso ? "bg-white" : "bg-zinc-700"}`} />
-          ))}
+      <main className="h-full bg-zinc-950 text-white flex flex-col px-8 pt-16 pb-10">
+        <div className="flex-1 flex flex-col items-center justify-center text-center">
+          <div className="text-5xl mb-6">{paso.emoji}</div>
+          <h1 className="text-2xl font-bold mb-3">{paso.titulo}</h1>
+          <p className="text-zinc-400 text-sm leading-relaxed mb-10">{paso.texto}</p>
+          <div className="flex gap-2">
+            {pasos.map((_, i) => (
+              <div key={i} className={`w-2 h-2 rounded-full ${i === onboardingPaso ? "bg-white" : "bg-zinc-700"}`} />
+            ))}
+          </div>
         </div>
-        {onboardingPaso < pasos.length - 1 ? (
-          <button
-            onClick={() => setOnboardingPaso(p => p + 1)}
-            className="w-full py-4 rounded-2xl bg-white text-zinc-950 font-bold text-base"
-          >
-            Siguiente
+        <div className="flex flex-col gap-3">
+          {onboardingPaso < pasos.length - 1 ? (
+            <button
+              onClick={() => setOnboardingPaso(p => p + 1)}
+              className="w-full py-4 rounded-2xl bg-white text-zinc-950 font-bold text-base"
+            >
+              Siguiente
+            </button>
+          ) : (
+            <button
+              onClick={terminarOnboarding}
+              className="w-full py-4 rounded-2xl bg-white text-zinc-950 font-bold text-base"
+            >
+              Empezar
+            </button>
+          )}
+          <button onClick={terminarOnboarding} className="w-full py-2 text-zinc-600 text-sm underline underline-offset-2">
+            Saltar
           </button>
-        ) : (
-          <button
-            onClick={terminarOnboarding}
-            className="w-full py-4 rounded-2xl bg-white text-zinc-950 font-bold text-base"
-          >
-            Empezar
-          </button>
-        )}
-        <button onClick={terminarOnboarding} className="mt-4 text-zinc-600 text-sm underline underline-offset-2">
-          Saltar
-        </button>
+        </div>
       </main>
     )
   }
 
   const reportesFiltrados = modo === "esperando" && rutaSeleccionada
     ? reportes.filter(r => r.rutaId === rutaSeleccionada.id && r.tipo === "en_bus")
-    : reportes
+    : []
 
   return (
     <main className="h-full bg-zinc-950 flex flex-col" style={{ height: "100dvh" }}>
@@ -244,21 +265,20 @@ export default function Home() {
             background: "rgba(9,9,11,0.85)", backdropFilter: "blur(8px)",
             border: `1px solid ${reporteActivo.rutaColor}`,
             borderRadius: 16, padding: "10px 14px",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
+            display: "flex", alignItems: "center",
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{
-                width: 8, height: 8, borderRadius: "50%",
-                backgroundColor: reporteActivo.rutaColor,
-                animation: "pulso 1.5s ease-in-out infinite",
-              }} />
-              <span style={{ fontSize: 13, color: "#fff" }}>
-                {reporteActivo.tipo === "en_bus" ? "Reportando" : "Esperando"} · {reporteActivo.rutaNombre.split("—")[0].trim()}
-              </span>
-            </div>
-            <button onClick={cancelarReporte} style={{ fontSize: 12, color: "#71717a", background: "none", border: "none", cursor: "pointer" }}>
-              Cancelar
-            </button>
+            <div style={{
+              width: 8, height: 8, borderRadius: "50%",
+              backgroundColor: reporteActivo.rutaColor,
+              animation: "pulso 1.5s ease-in-out infinite",
+              marginRight: 8, flexShrink: 0,
+            }} />
+            <span style={{ fontSize: 13, color: "#fff" }}>
+              {reporteActivo.tipo === "en_bus" ? "Reportando" : "Esperando"} · {reporteActivo.rutaNombre?.split("—")[0].trim()}
+              {reporteActivo.tipo === "esperando" && reportesFiltrados.length === 0 && (
+                <span style={{ color: "#71717a", fontSize: 11 }}> · Sin actividad</span>
+              )}
+            </span>
           </div>
         )}
 
@@ -271,28 +291,6 @@ export default function Home() {
             <p style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: 0 }}>
               ✅ Tu reporte fue publicado
             </p>
-          </div>
-        )}
-
-        {modo === "esperando" && rutaSeleccionada && reportesFiltrados.length === 0 && (
-          <div style={{
-            position: "absolute", bottom: 24, left: 24, right: 24, zIndex: 1000,
-            background: "rgba(9,9,11,0.9)", backdropFilter: "blur(8px)",
-            border: "1px solid #3f3f46", borderRadius: 16, padding: "16px",
-          }}>
-            <p style={{ color: "#a1a1aa", fontSize: 13, margin: "0 0 10px", textAlign: "center" }}>
-              Nadie reportando en la {rutaSeleccionada.nombre.split("—")[0].trim()} ahora mismo
-            </p>
-            <button
-              onClick={() => abrirDesplegable("en_bus")}
-              style={{
-                width: "100%", padding: "10px 0", borderRadius: 12,
-                background: "#fff", color: "#09090b",
-                fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
-              }}
-            >
-              Sé el primero en reportar
-            </button>
           </div>
         )}
 
@@ -311,14 +309,31 @@ export default function Home() {
 
       <div className="flex-shrink-0 px-4 pb-6 pt-4 flex flex-col gap-3">
         {estadoReporte === "activo" && reporteActivo?.tipo === "esperando" ? (
+          <div className="flex gap-3">
+            <button
+              onClick={cancelarReporte}
+              className="flex-1 py-4 rounded-2xl font-bold text-base"
+              style={{ background: "#27272a", color: "#a1a1aa" }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={subirAlBus}
+              className="flex-1 py-4 rounded-2xl font-bold text-base"
+              style={{ background: "#2563eb", color: "#fff" }}
+            >
+              ✓ Ya subí
+            </button>
+          </div>
+        ) : estadoReporte === "activo" && reporteActivo?.tipo === "en_bus" ? (
           <button
-            onClick={() => abrirDesplegable("en_bus")}
+            onClick={cancelarReporte}
             className="w-full py-4 rounded-2xl font-bold text-base"
-            style={{ background: "#2563eb", color: "#fff" }}
+            style={{ background: "#27272a", color: "#a1a1aa" }}
           >
-            ¿Ya subiste? Cambiar a "En el bus"
+            Cancelar reporte
           </button>
-        ) : estadoReporte !== "activo" ? (
+        ) : (
           <>
             <button
               onClick={() => abrirDesplegable("en_bus")}
@@ -336,14 +351,8 @@ export default function Home() {
             >
               {estadoReporte === "cargando" && modo === "esperando" ? "Publicando..." : "Espero el bus"}
             </button>
-            <button
-              onClick={() => setModo("idle")}
-              className="w-full py-2 text-sm text-zinc-500 underline underline-offset-2"
-            >
-              Ver mapa sin reportar
-            </button>
           </>
-        ) : null}
+        )}
       </div>
 
       {desplegableAbierto && (
