@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import { RUTAS } from "@/lib/rutas"
+import { supabase } from "@/lib/supabase"
 import { Reporte, Ruta } from "@/types"
 
 const MapaLeaflet = dynamic(() => import("@/components/MapaLeaflet"), { ssr: false })
@@ -13,7 +14,6 @@ type EstadoReporte = "idle" | "cargando" | "activo" | "error" | "sin_conexion"
 
 const ONBOARDING_KEY = "mi_ruta_onboarding_visto"
 const REPORTE_KEY = "mi_ruta_reporte_activo"
-const REPORTES_KEY = "mi_ruta_reportes"
 const TIMEOUT_REPORTE = 20 * 60 * 1000
 const TIMEOUT_GPS = 30 * 60 * 1000
 
@@ -31,6 +31,7 @@ export default function Home() {
   const [confirmacionVisible, setConfirmacionVisible] = useState(false)
   const [ultimaActividad, setUltimaActividad] = useState(Date.now())
 
+  // GPS
   useEffect(() => {
     if (!navigator.geolocation) { setGpsPermiso("denegado"); return }
     navigator.geolocation.getCurrentPosition(
@@ -42,19 +43,14 @@ export default function Home() {
     )
   }, [])
 
+  // Onboarding
   useEffect(() => {
     const visto = localStorage.getItem(ONBOARDING_KEY)
     if (!visto) setOnboardingVisto(false)
   }, [])
 
+  // Cargar reporte activo propio desde localStorage
   useEffect(() => {
-    const raw = localStorage.getItem(REPORTES_KEY)
-    if (raw) {
-      const todos: Reporte[] = JSON.parse(raw)
-      const vigentes = todos.filter(r => Date.now() - r.timestamp < TIMEOUT_REPORTE)
-      setReportes(vigentes)
-      localStorage.setItem(REPORTES_KEY, JSON.stringify(vigentes))
-    }
     const rawActivo = localStorage.getItem(REPORTE_KEY)
     if (rawActivo) {
       const r: Reporte = JSON.parse(rawActivo)
@@ -68,6 +64,59 @@ export default function Home() {
     }
   }, [])
 
+  // Cargar reportes desde Supabase
+  useEffect(() => {
+    const cargarReportes = async () => {
+      const limite = Date.now() - TIMEOUT_REPORTE
+      const { data, error } = await supabase
+        .from("reportes")
+        .select("*")
+        .gt("timestamp", limite)
+
+      if (!error && data) {
+        const reportesMapeados: Reporte[] = data.map((r: any) => ({
+          id: r.id.toString(),
+          rutaId: r.ruta_id,
+          rutaNombre: r.ruta_nombre,
+          rutaColor: r.ruta_color,
+          tipo: r.tipo,
+          lat: r.lat,
+          lng: r.lng,
+          timestamp: r.timestamp,
+          trazas: [],
+        }))
+        setReportes(reportesMapeados)
+      }
+    }
+
+    cargarReportes()
+
+    // Tiempo real — escuchar cambios en la tabla
+    const canal = supabase
+      .channel("reportes_tiempo_real")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "reportes" },
+        (payload) => {
+          const r = payload.new as any
+          const nuevoReporte: Reporte = {
+            id: r.id.toString(),
+            rutaId: r.ruta_id,
+            rutaNombre: r.ruta_nombre,
+            rutaColor: r.ruta_color,
+            tipo: r.tipo,
+            lat: r.lat,
+            lng: r.lng,
+            timestamp: r.timestamp,
+            trazas: [],
+          }
+          setReportes(prev => [...prev, nuevoReporte])
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(canal) }
+  }, [])
+
+  // GPS watch cuando hay reporte activo
   useEffect(() => {
     if (estadoReporte !== "activo") return
     const watchId = navigator.geolocation.watchPosition(
@@ -91,6 +140,7 @@ export default function Home() {
     return () => navigator.geolocation.clearWatch(watchId)
   }, [estadoReporte, ultimaActividad])
 
+  // Detectar actividad
   useEffect(() => {
     const actualizar = () => setUltimaActividad(Date.now())
     window.addEventListener("touchstart", actualizar)
@@ -115,24 +165,45 @@ export default function Home() {
     setDesplegableAbierto(false)
     setEstadoReporte("cargando")
 
-    const publicar = (pos: GeolocationPosition) => {
+    const publicar = async (pos: GeolocationPosition) => {
+      const tipo = modo === "en_bus" ? "en_bus" : "esperando"
+      const timestamp = Date.now()
+
+      const { data, error } = await supabase
+        .from("reportes")
+        .insert({
+          ruta_id: ruta.id,
+          ruta_nombre: ruta.nombre,
+          ruta_color: ruta.color,
+          tipo,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          timestamp,
+        })
+        .select()
+        .single()
+
+      if (error || !data) {
+        setEstadoReporte("sin_conexion")
+        return
+      }
+
       const reporte: Reporte = {
-        id: crypto.randomUUID(),
+        id: data.id.toString(),
         rutaId: ruta.id,
         rutaNombre: ruta.nombre,
         rutaColor: ruta.color,
-        tipo: modo === "en_bus" ? "en_bus" : "esperando",
+        tipo,
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
-        timestamp: Date.now(),
+        timestamp,
         trazas: [],
       }
-      const previos: Reporte[] = JSON.parse(localStorage.getItem(REPORTES_KEY) ?? "[]")
-      localStorage.setItem(REPORTES_KEY, JSON.stringify([...previos, reporte]))
+
       localStorage.setItem(REPORTE_KEY, JSON.stringify(reporte))
       setReporteActivo(reporte)
-      setReportes(prev => [...prev, reporte])
       setEstadoReporte("activo")
+
       if (modo === "en_bus") {
         setConfirmacionVisible(true)
         setTimeout(() => setConfirmacionVisible(false), 2000)
@@ -153,16 +224,19 @@ export default function Home() {
     intentar()
   }
 
-  function subirAlBus() {
+  async function subirAlBus() {
     if (!reporteActivo) return
     const actualizado: Reporte = {
       ...reporteActivo,
       tipo: "en_bus",
       timestamp: Date.now(),
     }
-    const todos: Reporte[] = JSON.parse(localStorage.getItem(REPORTES_KEY) ?? "[]")
-    const actualizados = todos.map(r => r.id === actualizado.id ? actualizado : r)
-    localStorage.setItem(REPORTES_KEY, JSON.stringify(actualizados))
+
+    await supabase
+      .from("reportes")
+      .update({ tipo: "en_bus", timestamp: actualizado.timestamp })
+      .eq("id", reporteActivo.id)
+
     localStorage.setItem(REPORTE_KEY, JSON.stringify(actualizado))
     setReporteActivo(actualizado)
     setModo("en_bus")
@@ -264,16 +338,14 @@ export default function Home() {
           />
         )}
 
-        {/* Ícono flotante */}
-<div style={{
-  position: "absolute", top: 16, left: 16, zIndex: 999,
-  pointerEvents: "none",
-  filter: "drop-shadow(0px 2px 6px rgba(0,0,0,0.9))",
-}}>
-  <Image src="/icono.svg" alt="Mi Ruta" width={50} height={50} />
-</div>
+        <div style={{
+          position: "absolute", top: 16, left: 16, zIndex: 999,
+          pointerEvents: "none",
+          filter: "drop-shadow(0px 2px 6px rgba(0,0,0,0.9))",
+        }}>
+          <Image src="/icono.svg" alt="Mi Ruta" width={50} height={50} />
+        </div>
 
-        {/* Chip de estado activo */}
         {estadoReporte === "activo" && reporteActivo && (
           <div style={{
             position: "absolute", top: 16, left: 60, right: 16, zIndex: 1000,
@@ -297,7 +369,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Pop confirmación */}
         {confirmacionVisible && (
           <div style={{
             position: "absolute", bottom: 24, left: 24, right: 24, zIndex: 1000,
@@ -310,7 +381,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Error sin conexión */}
         {estadoReporte === "sin_conexion" && (
           <div style={{
             position: "absolute", bottom: 24, left: 24, right: 24, zIndex: 1000,
@@ -324,7 +394,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* Botones */}
       <div className="flex-shrink-0 px-4 pb-8 pt-4 flex flex-col gap-3">
         {estadoReporte === "activo" && reporteActivo?.tipo === "esperando" ? (
           <div className="flex gap-3">
@@ -373,7 +442,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* Desplegable */}
       {desplegableAbierto && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 2000,
