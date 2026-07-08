@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
+import Image from "next/image"
 import { RUTAS } from "@/lib/rutas"
 import { Reporte, Ruta } from "@/types"
 
@@ -153,7 +154,7 @@ export default function Home() {
   }
 
   function subirAlBus() {
-    if (!reporteActivo || !rutaSeleccionada) return
+    if (!reporteActivo) return
     const actualizado: Reporte = {
       ...reporteActivo,
       tipo: "en_bus",
@@ -185,7 +186,7 @@ export default function Home() {
   if (gpsPermiso === "denegado") {
     return (
       <main className="h-full bg-zinc-950 text-white flex flex-col items-center justify-center px-6 text-center">
-        <div className="text-4xl mb-4">📍</div>
+        <Image src="/logo.svg" alt="Mi Ruta" width={80} height={80} className="mb-6 opacity-60" />
         <h1 className="text-xl font-bold mb-2">Necesitamos tu ubicación</h1>
         <p className="text-zinc-400 text-sm leading-relaxed">
           Mi Ruta funciona con GPS. Activa el permiso de ubicación en tu navegador y recarga la página.
@@ -202,20 +203,24 @@ export default function Home() {
 
   if (!onboardingVisto) {
     const pasos = [
-      { emoji: "🚌", titulo: "Reporta dónde vas", texto: "Dinos si estás en el bus o esperando uno. Solo toma dos toques." },
-      { emoji: "📍", titulo: "Ayuda a los demás", texto: "Tu ubicación aparece en el mapa para que otros sepan dónde va el bus." },
-      { emoji: "🗺️", titulo: "Todos ganamos", texto: "Mientras más personas reporten, mejor información tenemos todos. Es gratis." },
+      { subtexto: "Reporta dónde vas", texto: "Dinos si estás en el bus o esperando uno. Solo toma dos toques." },
+      { subtexto: "Ayuda a los demás", texto: "Tu ubicación aparece en el mapa para que otros sepan dónde va el bus." },
+      { subtexto: "Todos ganamos", texto: "Mientras más personas reporten, mejor información tenemos todos. Es gratis." },
     ]
     const paso = pasos[onboardingPaso]
     return (
-      <main className="h-full bg-zinc-950 text-white flex flex-col px-8 pt-16 pb-10">
+      <main className="h-full bg-zinc-950 text-white flex flex-col px-8 pt-12 pb-10">
         <div className="flex-1 flex flex-col items-center justify-center text-center">
-          <div className="text-5xl mb-6">{paso.emoji}</div>
-          <h1 className="text-2xl font-bold mb-3">{paso.titulo}</h1>
+          <Image src="/logo.svg" alt="Mi Ruta" width={130} height={130} className="mb-8" />
+          <h1 className="text-xl font-semibold mb-2">{paso.subtexto}</h1>
           <p className="text-zinc-400 text-sm leading-relaxed mb-10">{paso.texto}</p>
           <div className="flex gap-2">
             {pasos.map((_, i) => (
-              <div key={i} className={`w-2 h-2 rounded-full ${i === onboardingPaso ? "bg-white" : "bg-zinc-700"}`} />
+              <div
+                key={i}
+                style={{ transition: "width 0.3s" }}
+                className={`h-2 rounded-full ${i === onboardingPaso ? "bg-white w-6" : "bg-zinc-700 w-2"}`}
+              />
             ))}
           </div>
         </div>
@@ -223,14 +228,14 @@ export default function Home() {
           {onboardingPaso < pasos.length - 1 ? (
             <button
               onClick={() => setOnboardingPaso(p => p + 1)}
-              className="w-full py-4 rounded-2xl bg-white text-zinc-950 font-bold text-base"
+              className="w-full py-5 rounded-2xl bg-white text-zinc-950 font-bold text-base"
             >
               Siguiente
             </button>
           ) : (
             <button
               onClick={terminarOnboarding}
-              className="w-full py-4 rounded-2xl bg-white text-zinc-950 font-bold text-base"
+              className="w-full py-5 rounded-2xl bg-white text-zinc-950 font-bold text-base"
             >
               Empezar
             </button>
@@ -259,9 +264,19 @@ export default function Home() {
           />
         )}
 
+        {/* Ícono flotante */}
+<div style={{
+  position: "absolute", top: 16, left: 16, zIndex: 999,
+  pointerEvents: "none",
+  filter: "drop-shadow(0px 2px 6px rgba(0,0,0,0.9))",
+}}>
+  <Image src="/icono.svg" alt="Mi Ruta" width={50} height={50} />
+</div>
+
+        {/* Chip de estado activo */}
         {estadoReporte === "activo" && reporteActivo && (
           <div style={{
-            position: "absolute", top: 16, left: 16, right: 16, zIndex: 1000,
+            position: "absolute", top: 16, left: 60, right: 16, zIndex: 1000,
             background: "rgba(9,9,11,0.85)", backdropFilter: "blur(8px)",
             border: `1px solid ${reporteActivo.rutaColor}`,
             borderRadius: 16, padding: "10px 14px",
@@ -282,6 +297,7 @@ export default function Home() {
           </div>
         )}
 
+        {/* Pop confirmación */}
         {confirmacionVisible && (
           <div style={{
             position: "absolute", bottom: 24, left: 24, right: 24, zIndex: 1000,
@@ -294,6 +310,7 @@ export default function Home() {
           </div>
         )}
 
+        {/* Error sin conexión */}
         {estadoReporte === "sin_conexion" && (
           <div style={{
             position: "absolute", bottom: 24, left: 24, right: 24, zIndex: 1000,
@@ -307,19 +324,20 @@ export default function Home() {
         )}
       </div>
 
-      <div className="flex-shrink-0 px-4 pb-6 pt-4 flex flex-col gap-3">
+      {/* Botones */}
+      <div className="flex-shrink-0 px-4 pb-8 pt-4 flex flex-col gap-3">
         {estadoReporte === "activo" && reporteActivo?.tipo === "esperando" ? (
           <div className="flex gap-3">
             <button
               onClick={cancelarReporte}
-              className="flex-1 py-4 rounded-2xl font-bold text-base"
+              className="flex-1 py-5 rounded-2xl font-bold text-base"
               style={{ background: "#27272a", color: "#a1a1aa" }}
             >
               Cancelar
             </button>
             <button
               onClick={subirAlBus}
-              className="flex-1 py-4 rounded-2xl font-bold text-base"
+              className="flex-1 py-5 rounded-2xl font-bold text-base"
               style={{ background: "#2563eb", color: "#fff" }}
             >
               ✓ Ya subí
@@ -328,7 +346,7 @@ export default function Home() {
         ) : estadoReporte === "activo" && reporteActivo?.tipo === "en_bus" ? (
           <button
             onClick={cancelarReporte}
-            className="w-full py-4 rounded-2xl font-bold text-base"
+            className="w-full py-5 rounded-2xl font-bold text-base"
             style={{ background: "#27272a", color: "#a1a1aa" }}
           >
             Cancelar reporte
@@ -338,7 +356,7 @@ export default function Home() {
             <button
               onClick={() => abrirDesplegable("en_bus")}
               disabled={estadoReporte === "cargando"}
-              className="w-full py-4 rounded-2xl font-bold text-base disabled:opacity-40"
+              className="w-full py-5 rounded-2xl font-bold text-lg disabled:opacity-40"
               style={{ background: "#2563eb", color: "#fff" }}
             >
               {estadoReporte === "cargando" && modo === "en_bus" ? "Publicando..." : "Estoy en el bus"}
@@ -346,7 +364,7 @@ export default function Home() {
             <button
               onClick={() => abrirDesplegable("esperando")}
               disabled={estadoReporte === "cargando"}
-              className="w-full py-4 rounded-2xl font-bold text-base disabled:opacity-40"
+              className="w-full py-5 rounded-2xl font-bold text-lg disabled:opacity-40"
               style={{ background: "#16a34a", color: "#fff" }}
             >
               {estadoReporte === "cargando" && modo === "esperando" ? "Publicando..." : "Espero el bus"}
@@ -355,6 +373,7 @@ export default function Home() {
         )}
       </div>
 
+      {/* Desplegable */}
       {desplegableAbierto && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 2000,
