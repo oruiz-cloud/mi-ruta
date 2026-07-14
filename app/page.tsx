@@ -37,20 +37,20 @@ export default function Home() {
   const isDragging = useRef(false)
   const startY = useRef(0)
   const startIndex = useRef(0)
+  const ultimoIndiceVibrado = useRef(0) // NUEVO: evita vibrar más de una vez por índice
 
+  // Verificar si GPS está disponible
   useEffect(() => {
-    if (!navigator.geolocation) { setGpsPermiso("denegado"); return }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => { setMiPosicion({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setGpsPermiso("ok") },
-      () => setGpsPermiso("denegado")
-    )
+    if (!navigator.geolocation) setGpsPermiso("denegado")
   }, [])
 
+  // Onboarding
   useEffect(() => {
     const visto = localStorage.getItem(ONBOARDING_KEY)
     if (!visto) setOnboardingVisto(false)
   }, [])
 
+  // Reporte activo propio
   useEffect(() => {
     const raw = localStorage.getItem(REPORTE_KEY)
     if (!raw) return
@@ -64,6 +64,7 @@ export default function Home() {
     }
   }, [])
 
+  // Reportes desde Supabase + tiempo real
   useEffect(() => {
     const cargarReportes = async () => {
       const { data, error } = await supabase.from("reportes").select("*").gt("timestamp", Date.now() - TIMEOUT_REPORTE)
@@ -77,6 +78,7 @@ export default function Home() {
     return () => { supabase.removeChannel(canal) }
   }, [])
 
+  // GPS watch cuando hay reporte activo
   useEffect(() => {
     if (estadoReporte !== "activo") return
     const watchId = navigator.geolocation.watchPosition(
@@ -97,12 +99,28 @@ export default function Home() {
     return () => navigator.geolocation.clearWatch(watchId)
   }, [estadoReporte, ultimaActividad])
 
+  // Detectar actividad
   useEffect(() => {
     const actualizar = () => setUltimaActividad(Date.now())
     window.addEventListener("touchstart", actualizar)
     window.addEventListener("click", actualizar)
     return () => { window.removeEventListener("touchstart", actualizar); window.removeEventListener("click", actualizar) }
   }, [])
+
+  // NUEVO: Bloquear el scroll del body mientras el picker está abierto
+  // Esto evita que el navegador "robe" el gesto de arrastre y mueva la página de fondo
+  useEffect(() => {
+    if (pickerAbierto) {
+      const overflowOriginal = document.body.style.overflow
+      const overscrollOriginal = document.body.style.overscrollBehavior
+      document.body.style.overflow = "hidden"
+      document.body.style.overscrollBehavior = "none"
+      return () => {
+        document.body.style.overflow = overflowOriginal
+        document.body.style.overscrollBehavior = overscrollOriginal
+      }
+    }
+  }, [pickerAbierto])
 
   function mapearReporte(r: any): Reporte {
     return { id: r.id.toString(), rutaId: r.ruta_id, rutaNombre: r.ruta_nombre, rutaColor: r.ruta_color, tipo: r.tipo, lat: r.lat, lng: r.lng, timestamp: r.timestamp, trazas: [] }
@@ -122,17 +140,37 @@ export default function Home() {
     setPickerAbierto(true)
   }
 
+  function pedirGPS() {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setMiPosicion({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setGpsPermiso("ok")
+      },
+      () => setGpsPermiso("denegado")
+    )
+  }
+
   function onTouchStart(e: React.TouchEvent) {
     isDragging.current = true
     startY.current = e.touches[0].clientY
     startIndex.current = indiceRuta
+    ultimoIndiceVibrado.current = indiceRuta // NUEVO
   }
 
   function onTouchMove(e: React.TouchEvent) {
     if (!isDragging.current) return
     const delta = startY.current - e.touches[0].clientY
     const newIndex = Math.round(startIndex.current + delta / ITEM_HEIGHT)
-    setIndiceRuta(Math.max(0, Math.min(RUTAS.length - 1, newIndex)))
+    const indiceClamp = Math.max(0, Math.min(RUTAS.length - 1, newIndex))
+    setIndiceRuta(indiceClamp)
+
+    // NUEVO: vibración corta cada vez que el selector "cae" en una ruta distinta
+    if (indiceClamp !== ultimoIndiceVibrado.current) {
+      ultimoIndiceVibrado.current = indiceClamp
+      if (typeof navigator.vibrate === "function") {
+        navigator.vibrate(8) // milisegundos, muy sutil. iOS Safari lo ignora (no lo soporta), Android sí.
+      }
+    }
   }
 
   function onTouchEnd() {
@@ -200,17 +238,54 @@ export default function Home() {
     setOnboardingVisto(true)
   }
 
+  // Pantalla: GPS no disponible o pendiente
+  if (gpsPermiso === "pendiente") {
+    return (
+      <main style={{ height: "100dvh", background: "#F8F9FA", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 32px", textAlign: "center" }}>
+        <div style={{ width: 96, height: 96, borderRadius: "50%", background: "rgba(37,99,235,0.08)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
+          <span style={{ fontSize: 44 }}>📍</span>
+        </div>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827", marginBottom: 12, letterSpacing: -0.5 }}>
+          Activá tu ubicación
+        </h1>
+        <p style={{ fontSize: 16, color: "#6B7280", lineHeight: 1.6, marginBottom: 40, maxWidth: 280 }}>
+          Mi Ruta necesita saber dónde estás para mostrarte los buses cercanos en tiempo real.
+        </p>
+        <button
+          onClick={pedirGPS}
+          style={{
+            width: "100%", padding: "22px", borderRadius: 16, border: "none",
+            background: "#2563eb", color: "#fff", fontSize: 18, fontWeight: 700,
+            cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)",
+            letterSpacing: -0.3,
+          }}
+        >
+          Activar ubicación
+        </button>
+      </main>
+    )
+  }
+
+  // Pantalla: GPS denegado
   if (gpsPermiso === "denegado") {
     return (
       <main style={{ height: "100dvh", background: "#F8F9FA", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 32px", textAlign: "center" }}>
-        <Image src="/logo.svg" alt="Mi Ruta" width={80} height={80} style={{ marginBottom: 24, opacity: 0.5 }} loading="eager" />
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "#111827", marginBottom: 10 }}>Necesitamos tu ubicación</h1>
-        <p style={{ fontSize: 16, color: "#6B7280", lineHeight: 1.6, marginBottom: 32 }}>
-          Mi Ruta funciona con GPS. Activá el permiso de ubicación en tu navegador y recargá la página.
+        <div style={{ width: 96, height: 96, borderRadius: "50%", background: "rgba(239,68,68,0.08)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
+          <span style={{ fontSize: 44 }}>🚫</span>
+        </div>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827", marginBottom: 12, letterSpacing: -0.5 }}>
+          Ubicación bloqueada
+        </h1>
+        <p style={{ fontSize: 16, color: "#6B7280", lineHeight: 1.6, marginBottom: 40, maxWidth: 280 }}>
+          Activá el permiso de ubicación en la configuración de tu navegador y recargá la página.
         </p>
         <button
           onClick={() => window.location.reload()}
-          style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 16, padding: "18px 32px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)" }}
+          style={{
+            width: "100%", padding: "22px", borderRadius: 16, border: "none",
+            background: "#2563eb", color: "#fff", fontSize: 18, fontWeight: 700,
+            cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)",
+          }}
         >
           Ya lo activé — recargar
         </button>
@@ -218,6 +293,7 @@ export default function Home() {
     )
   }
 
+  // Onboarding
   if (!onboardingVisto) {
     const pasos = [
       { emoji: "🚌", titulo: "Reportá dónde vas", texto: "Decinos si estás en el bus o esperando uno. Solo toma dos toques." },
@@ -387,11 +463,15 @@ export default function Home() {
       {/* Picker ruleta */}
       {pickerAbierto && (
         <div
-          style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end" }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.5)",
+            backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end",
+            touchAction: "none", // NUEVO: bloquea gestos nativos del navegador en toda la capa
+          }}
           onClick={() => setPickerAbierto(false)}
         >
           <div
-            style={{ width: "100%", background: "#fff", borderRadius: "28px 28px 0 0", paddingBottom: 40 }}
+            style={{ width: "100%", background: "#fff", borderRadius: "28px 28px 0 0", paddingBottom: 40, touchAction: "none" }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ width: 44, height: 5, background: "#E5E7EB", borderRadius: 3, margin: "16px auto 20px" }} />
@@ -403,7 +483,7 @@ export default function Home() {
               Deslizá para seleccionar
             </p>
 
-            <div style={{ position: "relative", height: ITEM_HEIGHT * 5, overflow: "hidden", userSelect: "none" }}>
+            <div style={{ position: "relative", height: ITEM_HEIGHT * 5, overflow: "hidden", userSelect: "none", touchAction: "none" }}>
               <div style={{
                 position: "absolute", top: "50%", left: 20, right: 20,
                 transform: "translateY(-50%)", height: ITEM_HEIGHT,
@@ -431,6 +511,7 @@ export default function Home() {
                   position: "absolute", top: 0, left: 0, right: 0,
                   transform: `translateY(${(2 - indiceRuta) * ITEM_HEIGHT}px)`,
                   transition: isDragging.current ? "none" : "transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                  touchAction: "none", // NUEVO
                 }}
               >
                 {RUTAS.map((ruta, i) => {
