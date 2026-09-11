@@ -11,6 +11,7 @@ const MapaLeaflet = dynamic(() => import("@/components/MapaLeaflet"), { ssr: fal
 
 type Modo = "idle" | "en_bus" | "esperando"
 type EstadoReporte = "idle" | "cargando" | "activo" | "sin_conexion"
+type ModoPicker = "nuevo" | "cambiar" // NUEVO
 
 const ONBOARDING_KEY = "mi_ruta_onboarding_visto"
 const REPORTE_KEY = "mi_ruta_reporte_activo"
@@ -19,14 +20,17 @@ const TIMEOUT_GPS = 30 * 60 * 1000
 const MAX_INTENTOS = 3
 const INTERVALO_REINTENTO = 30000
 const ITEM_HEIGHT = 80
+const AVISO_VENCIMIENTO = 2 * 60 * 1000 // NUEVO: avisar cuando falten 2 min o menos
 
 export default function Home() {
   const [onboardingVisto, setOnboardingVisto] = useState(true)
   const [onboardingPaso, setOnboardingPaso] = useState(0)
   const [modo, setModo] = useState<Modo>("idle")
+  const [modoPicker, setModoPicker] = useState<ModoPicker>("nuevo") // NUEVO
   const [pickerAbierto, setPickerAbierto] = useState(false)
   const [rutaSeleccionada, setRutaSeleccionada] = useState<Ruta | null>(null)
   const [indiceRuta, setIndiceRuta] = useState(0)
+  const [busquedaRuta, setBusquedaRuta] = useState("") // NUEVO
   const [estadoReporte, setEstadoReporte] = useState<EstadoReporte>("idle")
   const [reporteActivo, setReporteActivo] = useState<Reporte | null>(null)
   const [reportes, setReportes] = useState<Reporte[]>([])
@@ -34,10 +38,11 @@ export default function Home() {
   const [gpsPermiso, setGpsPermiso] = useState<"pendiente" | "ok" | "denegado">("pendiente")
   const [confirmacionVisible, setConfirmacionVisible] = useState(false)
   const [ultimaActividad, setUltimaActividad] = useState(Date.now())
+  const [ahora, setAhora] = useState(Date.now()) // NUEVO: para calcular tiempo restante del reporte
   const isDragging = useRef(false)
   const startY = useRef(0)
   const startIndex = useRef(0)
-  const ultimoIndiceVibrado = useRef(0) // NUEVO: evita vibrar más de una vez por índice
+  const ultimoIndiceVibrado = useRef(0)
 
   // Verificar si GPS está disponible
   useEffect(() => {
@@ -107,8 +112,7 @@ export default function Home() {
     return () => { window.removeEventListener("touchstart", actualizar); window.removeEventListener("click", actualizar) }
   }, [])
 
-  // NUEVO: Bloquear el scroll del body mientras el picker está abierto
-  // Esto evita que el navegador "robe" el gesto de arrastre y mueva la página de fondo
+  // Bloquear el scroll del body mientras el picker está abierto
   useEffect(() => {
     if (pickerAbierto) {
       const overflowOriginal = document.body.style.overflow
@@ -121,6 +125,25 @@ export default function Home() {
       }
     }
   }, [pickerAbierto])
+
+  // NUEVO: reloj interno que se actualiza cada 15s mientras hay un reporte activo,
+  // para poder calcular cuánto le queda antes de vencer sin refrescar la página
+  useEffect(() => {
+    if (estadoReporte !== "activo") return
+    const intervalo = setInterval(() => setAhora(Date.now()), 15000)
+    return () => clearInterval(intervalo)
+  }, [estadoReporte])
+
+  // NUEVO: tiempo restante del reporte activo, y si está por vencer
+  const tiempoRestante = reporteActivo ? TIMEOUT_REPORTE - (ahora - reporteActivo.timestamp) : null
+  const reporteApuntoDeVencer = tiempoRestante !== null && tiempoRestante > 0 && tiempoRestante <= AVISO_VENCIMIENTO
+
+  // NUEVO: si el tiempo ya se agotó del todo mientras la app seguía abierta, cancelar solo
+  useEffect(() => {
+    if (estadoReporte === "activo" && tiempoRestante !== null && tiempoRestante <= 0) {
+      cancelarReporte()
+    }
+  }, [tiempoRestante, estadoReporte])
 
   function mapearReporte(r: any): Reporte {
     return { id: r.id.toString(), rutaId: r.ruta_id, rutaNombre: r.ruta_nombre, rutaColor: r.ruta_color, tipo: r.tipo, lat: r.lat, lng: r.lng, timestamp: r.timestamp, trazas: [] }
@@ -135,8 +158,11 @@ export default function Home() {
     return reportes.filter(r => r.rutaId === rutaId && Date.now() - r.timestamp < TIMEOUT_REPORTE).length
   }
 
-  function abrirPicker(m: Modo) {
+  // NUEVO: acepta un segundo parámetro para distinguir "reporte nuevo" de "cambiar ruta del reporte activo"
+  function abrirPicker(m: Modo, modoP: ModoPicker = "nuevo") {
     setModo(m)
+    setModoPicker(modoP)
+    setBusquedaRuta("")
     setPickerAbierto(true)
   }
 
@@ -154,7 +180,7 @@ export default function Home() {
     isDragging.current = true
     startY.current = e.touches[0].clientY
     startIndex.current = indiceRuta
-    ultimoIndiceVibrado.current = indiceRuta // NUEVO
+    ultimoIndiceVibrado.current = indiceRuta
   }
 
   function onTouchMove(e: React.TouchEvent) {
@@ -164,11 +190,10 @@ export default function Home() {
     const indiceClamp = Math.max(0, Math.min(RUTAS.length - 1, newIndex))
     setIndiceRuta(indiceClamp)
 
-    // NUEVO: vibración corta cada vez que el selector "cae" en una ruta distinta
     if (indiceClamp !== ultimoIndiceVibrado.current) {
       ultimoIndiceVibrado.current = indiceClamp
       if (typeof navigator.vibrate === "function") {
-        navigator.vibrate(8) // milisegundos, muy sutil. iOS Safari lo ignora (no lo soporta), Android sí.
+        navigator.vibrate(8)
       }
     }
   }
@@ -177,10 +202,40 @@ export default function Home() {
     isDragging.current = false
   }
 
+  // NUEVO: buscar ruta por número escrito y saltar el selector a esa posición
+  function onCambiarBusqueda(valor: string) {
+    const soloNumeros = valor.replace(/[^0-9]/g, "")
+    setBusquedaRuta(soloNumeros)
+    const encontrada = RUTAS.findIndex(r => r.id === soloNumeros)
+    if (encontrada !== -1) {
+      setIndiceRuta(encontrada)
+      if (typeof navigator.vibrate === "function") navigator.vibrate(8)
+    }
+  }
+
   async function confirmarRuta() {
     const ruta = RUTAS[indiceRuta]
-    setRutaSeleccionada(ruta)
     setPickerAbierto(false)
+
+    // NUEVO: si estamos cambiando la ruta de un reporte ya activo, solo actualizamos ese registro
+    if (modoPicker === "cambiar" && reporteActivo) {
+      setRutaSeleccionada(ruta)
+      const timestamp = Date.now()
+      const { error } = await supabase.from("reportes").update({
+        ruta_id: ruta.id, ruta_nombre: ruta.nombre, ruta_color: ruta.color, timestamp,
+      }).eq("id", reporteActivo.id)
+
+      if (error) { setEstadoReporte("sin_conexion"); return }
+
+      const actualizado: Reporte = { ...reporteActivo, rutaId: ruta.id, rutaNombre: ruta.nombre, rutaColor: ruta.color, timestamp }
+      localStorage.setItem(REPORTE_KEY, JSON.stringify(actualizado))
+      setReporteActivo(actualizado)
+      setAhora(Date.now())
+      mostrarConfirmacion()
+      return
+    }
+
+    setRutaSeleccionada(ruta)
     setEstadoReporte("cargando")
 
     const publicar = async (pos: GeolocationPosition) => {
@@ -201,6 +256,7 @@ export default function Home() {
       localStorage.setItem(REPORTE_KEY, JSON.stringify(reporte))
       setReporteActivo(reporte)
       setEstadoReporte("activo")
+      setAhora(Date.now())
       if (modo === "en_bus") mostrarConfirmacion()
     }
 
@@ -222,7 +278,19 @@ export default function Home() {
     localStorage.setItem(REPORTE_KEY, JSON.stringify(actualizado))
     setReporteActivo(actualizado)
     setModo("en_bus")
+    setAhora(Date.now())
     mostrarConfirmacion()
+  }
+
+  // NUEVO: extender el reporte activo sin cambiar de ruta (botón del aviso de vencimiento)
+  async function refrescarReporte() {
+    if (!reporteActivo) return
+    const timestamp = Date.now()
+    await supabase.from("reportes").update({ timestamp }).eq("id", reporteActivo.id)
+    const actualizado = { ...reporteActivo, timestamp }
+    localStorage.setItem(REPORTE_KEY, JSON.stringify(actualizado))
+    setReporteActivo(actualizado)
+    setAhora(Date.now())
   }
 
   function cancelarReporte() {
@@ -236,6 +304,59 @@ export default function Home() {
   function terminarOnboarding() {
     localStorage.setItem(ONBOARDING_KEY, "1")
     setOnboardingVisto(true)
+  }
+
+  // NUEVO ORDEN: primero el onboarding, después los permisos de GPS.
+  // Así el usuario entiende para qué sirve la app antes de que le pidamos su ubicación.
+
+  // Onboarding
+  if (!onboardingVisto) {
+    const pasos = [
+      { emoji: "🚌", titulo: "Reportá dónde vas", texto: "Decinos si estás en el bus o esperando uno. Solo toma dos toques." },
+      { emoji: "📍", titulo: "Ayudá a los demás", texto: "Tu ubicación aparece en el mapa para que otros sepan dónde va el bus." },
+      { emoji: "🗺️", titulo: "Todos ganamos", texto: "Mientras más personas reporten, mejor información tenemos todos. Es gratis." },
+    ]
+    const paso = pasos[onboardingPaso]
+    return (
+      <main style={{ height: "100dvh", background: "#F8F9FA", display: "flex", flexDirection: "column", padding: "48px 32px 40px" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+          <Image src="/logo.svg" alt="Mi Ruta" width={120} height={120} style={{ marginBottom: 24 }} loading="eager" />
+          <div style={{ fontSize: 44, marginBottom: 16 }}>{paso.emoji}</div>
+          <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827", marginBottom: 12, letterSpacing: -0.5 }}>{paso.titulo}</h1>
+          <p style={{ fontSize: 16, color: "#6B7280", lineHeight: 1.6, marginBottom: 32, maxWidth: 280 }}>{paso.texto}</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            {pasos.map((_, i) => (
+              <div key={i} style={{
+                height: 8, borderRadius: 4,
+                background: i === onboardingPaso ? "#2563eb" : "#E5E7EB",
+                width: i === onboardingPaso ? 28 : 8,
+                transition: "all 0.3s"
+              }} />
+            ))}
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {onboardingPaso < pasos.length - 1 ? (
+            <button
+              onClick={() => setOnboardingPaso(p => p + 1)}
+              style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)" }}
+            >
+              Siguiente
+            </button>
+          ) : (
+            <button
+              onClick={terminarOnboarding}
+              style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)" }}
+            >
+              Empezar
+            </button>
+          )}
+          <button onClick={terminarOnboarding} style={{ background: "none", border: "none", color: "#9CA3AF", fontSize: 15, cursor: "pointer", padding: "10px" }}>
+            Saltar
+          </button>
+        </div>
+      </main>
+    )
   }
 
   // Pantalla: GPS no disponible o pendiente
@@ -293,56 +414,6 @@ export default function Home() {
     )
   }
 
-  // Onboarding
-  if (!onboardingVisto) {
-    const pasos = [
-      { emoji: "🚌", titulo: "Reportá dónde vas", texto: "Decinos si estás en el bus o esperando uno. Solo toma dos toques." },
-      { emoji: "📍", titulo: "Ayudá a los demás", texto: "Tu ubicación aparece en el mapa para que otros sepan dónde va el bus." },
-      { emoji: "🗺️", titulo: "Todos ganamos", texto: "Mientras más personas reporten, mejor información tenemos todos. Es gratis." },
-    ]
-    const paso = pasos[onboardingPaso]
-    return (
-      <main style={{ height: "100dvh", background: "#F8F9FA", display: "flex", flexDirection: "column", padding: "48px 32px 40px" }}>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-          <Image src="/logo.svg" alt="Mi Ruta" width={120} height={120} style={{ marginBottom: 24 }} loading="eager" />
-          <div style={{ fontSize: 44, marginBottom: 16 }}>{paso.emoji}</div>
-          <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827", marginBottom: 12, letterSpacing: -0.5 }}>{paso.titulo}</h1>
-          <p style={{ fontSize: 16, color: "#6B7280", lineHeight: 1.6, marginBottom: 32, maxWidth: 280 }}>{paso.texto}</p>
-          <div style={{ display: "flex", gap: 8 }}>
-            {pasos.map((_, i) => (
-              <div key={i} style={{
-                height: 8, borderRadius: 4,
-                background: i === onboardingPaso ? "#2563eb" : "#E5E7EB",
-                width: i === onboardingPaso ? 28 : 8,
-                transition: "all 0.3s"
-              }} />
-            ))}
-          </div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {onboardingPaso < pasos.length - 1 ? (
-            <button
-              onClick={() => setOnboardingPaso(p => p + 1)}
-              style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)" }}
-            >
-              Siguiente
-            </button>
-          ) : (
-            <button
-              onClick={terminarOnboarding}
-              style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)" }}
-            >
-              Empezar
-            </button>
-          )}
-          <button onClick={terminarOnboarding} style={{ background: "none", border: "none", color: "#9CA3AF", fontSize: 15, cursor: "pointer", padding: "10px" }}>
-            Saltar
-          </button>
-        </div>
-      </main>
-    )
-  }
-
   const reportesFiltrados = modo === "esperando" && rutaSeleccionada
     ? reportes.filter(r => r.rutaId === rutaSeleccionada.id && r.tipo === "en_bus")
     : []
@@ -353,7 +424,7 @@ export default function Home() {
       {/* Mapa */}
       <div style={{ flex: 1, position: "relative", minHeight: 0, borderRadius: "0 0 28px 28px", overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
         {gpsPermiso === "ok" && (
-          <MapaLeaflet reportes={reportesFiltrados} miPosicion={miPosicion} reporteActivo={reporteActivo} />
+          <MapaLeaflet reportes={reportesFiltrados} rutaSeleccionadaId={rutaSeleccionada?.id ?? null} miPosicion={miPosicion} reporteActivo={reporteActivo} />
         )}
 
         <div style={{ position: "absolute", top: 16, left: 16, zIndex: 999, pointerEvents: "none", filter: "drop-shadow(0px 2px 8px rgba(0,0,0,0.2))" }}>
@@ -403,32 +474,72 @@ export default function Home() {
             <p style={{ color: "#DC2626", fontSize: 15, fontWeight: 600, margin: 0 }}>Sin conexión. Tu reporte no está activo.</p>
           </div>
         )}
+
+        {/* NUEVO: aviso cuando el reporte está por vencer, con opción de extenderlo */}
+        {estadoReporte === "activo" && reporteApuntoDeVencer && !confirmacionVisible && (
+          <div style={{
+            position: "absolute", bottom: 24, left: 24, right: 24, zIndex: 1000,
+            background: "#FFFBEB", border: "1.5px solid #FDE68A", borderRadius: 16,
+            padding: "16px", textAlign: "center"
+          }}>
+            <p style={{ color: "#92400E", fontSize: 15, fontWeight: 600, margin: "0 0 10px" }}>
+              Tu reporte vence en {Math.max(1, Math.ceil((tiempoRestante ?? 0) / 60000))} min
+            </p>
+            <button
+              onClick={refrescarReporte}
+              style={{
+                background: "#F59E0B", color: "#fff", border: "none", borderRadius: 12,
+                padding: "10px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              Sigo esperando — actualizar
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Botones */}
       <div style={{ flexShrink: 0, padding: "20px 20px 36px", display: "flex", flexDirection: "column", gap: 12 }}>
         {estadoReporte === "activo" && reporteActivo?.tipo === "esperando" ? (
-          <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                onClick={cancelarReporte}
+                style={{ flex: 1, padding: "20px", borderRadius: 16, border: "1.5px solid #E5E7EB", background: "#fff", color: "#6B7280", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={subirAlBus}
+                style={{ flex: 1, padding: "20px", borderRadius: 16, border: "none", background: "#2563eb", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)" }}
+              >
+                ✓ Ya subí
+              </button>
+            </div>
+            {/* NUEVO */}
             <button
-              onClick={cancelarReporte}
-              style={{ flex: 1, padding: "20px", borderRadius: 16, border: "1.5px solid #E5E7EB", background: "#fff", color: "#6B7280", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
+              onClick={() => abrirPicker("esperando", "cambiar")}
+              style={{ background: "none", border: "none", color: "#2563eb", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: "8px" }}
             >
-              Cancelar
-            </button>
-            <button
-              onClick={subirAlBus}
-              style={{ flex: 1, padding: "20px", borderRadius: 16, border: "none", background: "#2563eb", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)" }}
-            >
-              ✓ Ya subí
+              Cambiar ruta
             </button>
           </div>
         ) : estadoReporte === "activo" && reporteActivo?.tipo === "en_bus" ? (
-          <button
-            onClick={cancelarReporte}
-            style={{ width: "100%", padding: "20px", borderRadius: 16, border: "1.5px solid #E5E7EB", background: "#fff", color: "#6B7280", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
-          >
-            Cancelar reporte
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button
+              onClick={cancelarReporte}
+              style={{ width: "100%", padding: "20px", borderRadius: 16, border: "1.5px solid #E5E7EB", background: "#fff", color: "#6B7280", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
+            >
+              Cancelar reporte
+            </button>
+            {/* NUEVO */}
+            <button
+              onClick={() => abrirPicker("en_bus", "cambiar")}
+              style={{ background: "none", border: "none", color: "#2563eb", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: "8px" }}
+            >
+              Cambiar ruta
+            </button>
+          </div>
         ) : (
           <>
             <button
@@ -466,7 +577,7 @@ export default function Home() {
           style={{
             position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.5)",
             backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end",
-            touchAction: "none", // NUEVO: bloquea gestos nativos del navegador en toda la capa
+            touchAction: "none",
           }}
           onClick={() => setPickerAbierto(false)}
         >
@@ -477,11 +588,28 @@ export default function Home() {
             <div style={{ width: 44, height: 5, background: "#E5E7EB", borderRadius: 3, margin: "16px auto 20px" }} />
 
             <p style={{ textAlign: "center", fontSize: 22, color: "#111827", margin: "0 0 6px", fontWeight: 700, letterSpacing: -0.5 }}>
-              {modo === "en_bus" ? "¿En qué bus vas?" : "¿Qué bus esperás?"}
+              {modoPicker === "cambiar" ? "¿A qué ruta cambiás?" : modo === "en_bus" ? "¿En qué bus vas?" : "¿Qué bus esperás?"}
             </p>
             <p style={{ textAlign: "center", fontSize: 15, color: "#9CA3AF", margin: "0 0 16px", fontWeight: 400 }}>
-              Deslizá para seleccionar
+              Deslizá para seleccionar o escribí el número
             </p>
+
+            {/* NUEVO: buscador numérico */}
+            <div style={{ padding: "0 20px 12px" }}>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={busquedaRuta}
+                onChange={(e) => onCambiarBusqueda(e.target.value)}
+                placeholder="Escribí el número de ruta"
+                style={{
+                  width: "100%", padding: "14px 16px", borderRadius: 14,
+                  border: "1.5px solid #E5E7EB", fontSize: 16, textAlign: "center",
+                  color: "#111827", outline: "none", boxSizing: "border-box",
+                }}
+              />
+            </div>
 
             <div style={{ position: "relative", height: ITEM_HEIGHT * 5, overflow: "hidden", userSelect: "none", touchAction: "none" }}>
               <div style={{
@@ -511,7 +639,7 @@ export default function Home() {
                   position: "absolute", top: 0, left: 0, right: 0,
                   transform: `translateY(${(2 - indiceRuta) * ITEM_HEIGHT}px)`,
                   transition: isDragging.current ? "none" : "transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-                  touchAction: "none", // NUEVO
+                  touchAction: "none",
                 }}
               >
                 {RUTAS.map((ruta, i) => {
@@ -570,7 +698,7 @@ export default function Home() {
       )}
 
       <style>{`
-        @keyframes pulso {
+      @keyframes pulso {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.4; transform: scale(0.8); }
         }
