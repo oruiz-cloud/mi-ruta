@@ -328,7 +328,7 @@ export default function Home() {
             {pasos.map((_, i) => (
               <div key={i} style={{
                 height: 8, borderRadius: 4,
-                background: i === onboardingPaso ? "#2563eb" : "#E5E7EB",
+                background: i === onboardingPaso ? "#0E9F6E" : "#E5E7EB",
                 width: i === onboardingPaso ? 28 : 8,
                 transition: "all 0.3s"
               }} />
@@ -339,14 +339,14 @@ export default function Home() {
           {onboardingPaso < pasos.length - 1 ? (
             <button
               onClick={() => setOnboardingPaso(p => p + 1)}
-              style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)" }}
+              style={{ background: "#0E9F6E", color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)" }}
             >
               Siguiente
             </button>
           ) : (
             <button
               onClick={terminarOnboarding}
-              style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)" }}
+              style={{ background: "#0E9F6E", color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)" }}
             >
               Empezar
             </button>
@@ -363,7 +363,7 @@ export default function Home() {
   if (gpsPermiso === "pendiente") {
     return (
       <main style={{ height: "100dvh", background: "#F8F9FA", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 32px", textAlign: "center" }}>
-        <div style={{ width: 96, height: 96, borderRadius: "50%", background: "rgba(37,99,235,0.08)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
+        <div style={{ width: 96, height: 96, borderRadius: "50%", background: "rgba(14,159,110,0.08)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
           <span style={{ fontSize: 44 }}>📍</span>
         </div>
         <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827", marginBottom: 12, letterSpacing: -0.5 }}>
@@ -376,8 +376,8 @@ export default function Home() {
           onClick={pedirGPS}
           style={{
             width: "100%", padding: "22px", borderRadius: 16, border: "none",
-            background: "#2563eb", color: "#fff", fontSize: 18, fontWeight: 700,
-            cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)",
+            background: "#0E9F6E", color: "#fff", fontSize: 18, fontWeight: 700,
+            cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)",
             letterSpacing: -0.3,
           }}
         >
@@ -404,8 +404,8 @@ export default function Home() {
           onClick={() => window.location.reload()}
           style={{
             width: "100%", padding: "22px", borderRadius: 16, border: "none",
-            background: "#2563eb", color: "#fff", fontSize: 18, fontWeight: 700,
-            cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)",
+            background: "#0E9F6E", color: "#fff", fontSize: 18, fontWeight: 700,
+            cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)",
           }}
         >
           Ya lo activé — recargar
@@ -441,7 +441,7 @@ export default function Home() {
           }}>
             <div style={{
               width: 10, height: 10, borderRadius: "50%",
-              backgroundColor: "#2563eb",
+              backgroundColor: "#0E9F6E",
               animation: "pulso 1.5s ease-in-out infinite",
               marginRight: 10, flexShrink: 0,
             }} />
@@ -511,7 +511,7 @@ export default function Home() {
               </button>
               <button
                 onClick={subirAlBus}
-                style={{ flex: 1, padding: "20px", borderRadius: 16, border: "none", background: "#2563eb", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)" }}
+                style={{ flex: 1, padding: "20px", borderRadius: 16, border: "none", background: "#0E9F6E", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)" }}
               >
                 ✓ Ya subí
               </button>
@@ -519,7 +519,7 @@ export default function Home() {
             {/* NUEVO */}
             <button
               onClick={() => abrirPicker("esperando", "cambiar")}
-              style={{ background: "none", border: "none", color: "#2563eb", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: "8px" }}
+              style={{ background: "none", border: "none", color: "#0E9F6E", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: "8px" }}
             >
               Cambiar ruta
             </button>
@@ -535,7 +535,7 @@ export default function Home() {
             {/* NUEVO */}
             <button
               onClick={() => abrirPicker("en_bus", "cambiar")}
-              style={{ background: "none", border: "none", color: "#2563eb", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: "8px" }}
+              style={{ background: "none", border: "none", color: "#0E9F6E", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: "8px" }}
             >
               Cambiar ruta
             </button>
@@ -547,8 +547,8 @@ export default function Home() {
               disabled={estadoReporte === "cargando"}
               style={{
                 width: "100%", padding: "22px", borderRadius: 16, border: "none",
-                background: "#2563eb", color: "#fff", fontSize: 18, fontWeight: 700,
-                cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)",
+                background: "#0E9F6E", color: "#fff", fontSize: 18, fontWeight: 700,
+                cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)",
                 opacity: estadoReporte === "cargando" ? 0.6 : 1, letterSpacing: -0.3,
               }}
             >
@@ -559,8 +559,8 @@ export default function Home() {
               disabled={estadoReporte === "cargando"}
               style={{
                 width: "100%", padding: "22px", borderRadius: 16,
-                border: "2px solid #2563eb", background: "#fff",
-                color: "#2563eb", fontSize: 18, fontWeight: 700,
+                border: "2px solid #0E9F6E", background: "#fff",
+                color: "#0E9F6E", fontSize: 18, fontWeight: 700,
                 cursor: "pointer", letterSpacing: -0.3,
                 opacity: estadoReporte === "cargando" ? 0.6 : 1,
               }}
@@ -615,8 +615,8 @@ export default function Home() {
               <div style={{
                 position: "absolute", top: "50%", left: 20, right: 20,
                 transform: "translateY(-50%)", height: ITEM_HEIGHT,
-                borderTop: "2.5px solid #2563eb", borderBottom: "2.5px solid #2563eb",
-                borderRadius: 14, background: "rgba(37,99,235,0.06)",
+                borderTop: "2.5px solid #0E9F6E", borderBottom: "2.5px solid #0E9F6E",
+                borderRadius: 14, background: "rgba(14,159,110,0.06)",
                 pointerEvents: "none", zIndex: 10,
               }} />
 
@@ -660,7 +660,7 @@ export default function Home() {
                       <span style={{
                         fontSize: distancia === 0 ? 44 : 20,
                         fontWeight: 700,
-                        color: distancia === 0 ? "#2563eb" : "#9CA3AF",
+                        color: distancia === 0 ? "#0E9F6E" : "#9CA3AF",
                         letterSpacing: -1,
                         transition: "all 0.25s",
                       }}>
@@ -668,8 +668,8 @@ export default function Home() {
                       </span>
                       {activos > 0 && distancia === 0 && (
                         <span style={{
-                          fontSize: 13, color: "#2563eb", fontWeight: 600,
-                          background: "rgba(37,99,235,0.1)", padding: "4px 10px", borderRadius: 20
+                          fontSize: 13, color: "#0E9F6E", fontWeight: 600,
+                          background: "rgba(14,159,110,0.1)", padding: "4px 10px", borderRadius: 20
                         }}>
                           {activos} activo{activos > 1 ? "s" : ""}
                         </span>
@@ -685,8 +685,8 @@ export default function Home() {
                 onClick={confirmarRuta}
                 style={{
                   width: "100%", padding: "22px", borderRadius: 16, border: "none",
-                  background: "#2563eb", color: "#fff", fontSize: 18, fontWeight: 700,
-                  cursor: "pointer", boxShadow: "0 4px 14px rgba(37,99,235,0.3)",
+                  background: "#0E9F6E", color: "#fff", fontSize: 18, fontWeight: 700,
+                  cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)",
                   letterSpacing: -0.3,
                 }}
               >

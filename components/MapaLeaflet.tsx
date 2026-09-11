@@ -74,7 +74,7 @@ export default function MapaLeaflet({ reportes, rutaSeleccionadaId, miPosicion, 
             radius={8}
             pathOptions={{
               color: "#fff",
-              fillColor: "#3b82f6",
+              fillColor: "#0E9F6E",
               fillOpacity: 1,
               weight: 2,
             }}
