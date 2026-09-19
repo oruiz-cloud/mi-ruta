@@ -91,8 +91,8 @@ export default function MapaLeaflet({ reportes, rutaSeleccionadaId, miPosicion, 
               center={[r.lat, r.lng]}
               radius={enBus ? 8 : 5}
               pathOptions={{
-                color: "#9CA3AF",
-                fillColor: "#9CA3AF",
+                color: "#8B929C",
+                fillColor: "#8B929C",
                 fillOpacity: enBus ? 0.5 : 0.35,
                 weight: 1.5,
                 className: "marcador-pulso-gris",

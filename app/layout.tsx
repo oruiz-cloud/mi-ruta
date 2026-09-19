@@ -25,7 +25,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Mi Ruta" />
-        <link rel="apple-touch-icon" href="/icono.svg" />
+        <link rel="apple-touch-icon" href="/icono-solid.svg" />
       </head>
       <body className="h-full">{children}</body>
     </html>

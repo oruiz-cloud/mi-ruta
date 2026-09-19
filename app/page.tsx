@@ -6,6 +6,12 @@ import Image from "next/image"
 import { RUTAS } from "@/lib/rutas"
 import { supabase } from "@/lib/supabase"
 import { Reporte, Ruta } from "@/types"
+import { IconoBus, IconoPin, IconoPinBloqueado, IconoRed, IconoCheck, IconoReloj, IconoAlerta, Insignia } from "@/components/Iconos"
+
+const INK = "#14171A"
+const INK_SUAVE = "#5C6470"
+const ACENTO = "#0E9F6E"
+const PELIGRO = "#DC2626"
 
 const MapaLeaflet = dynamic(() => import("@/components/MapaLeaflet"), { ssr: false })
 
@@ -312,23 +318,25 @@ export default function Home() {
   // Onboarding
   if (!onboardingVisto) {
     const pasos = [
-      { emoji: "🚌", titulo: "Reportá dónde vas", texto: "Decinos si estás en el bus o esperando uno. Solo toma dos toques." },
-      { emoji: "📍", titulo: "Ayudá a los demás", texto: "Tu ubicación aparece en el mapa para que otros sepan dónde va el bus." },
-      { emoji: "🗺️", titulo: "Todos ganamos", texto: "Mientras más personas reporten, mejor información tenemos todos. Es gratis." },
+      { Icono: IconoBus, titulo: "Reportá dónde vas", texto: "Decinos si estás en el bus o esperando uno. Solo toma dos toques." },
+      { Icono: IconoPin, titulo: "Ayudá a los demás", texto: "Tu ubicación aparece en el mapa para que otros sepan dónde va el bus." },
+      { Icono: IconoRed, titulo: "Todos ganamos", texto: "Mientras más personas reporten, mejor información tenemos todos. Es gratis." },
     ]
     const paso = pasos[onboardingPaso]
     return (
-      <main style={{ height: "100dvh", background: "#F8F9FA", display: "flex", flexDirection: "column", padding: "48px 32px 40px" }}>
+      <main style={{ height: "100dvh", background: "#FAFAF8", display: "flex", flexDirection: "column", padding: "28px 32px 40px" }}>
+        <Image src="/logo-ink.svg" alt="Mi Ruta" width={72} height={90} style={{ opacity: 0.85 }} loading="eager" />
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-          <Image src="/logo.svg" alt="Mi Ruta" width={120} height={120} style={{ marginBottom: 24 }} loading="eager" />
-          <div style={{ fontSize: 44, marginBottom: 16 }}>{paso.emoji}</div>
-          <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827", marginBottom: 12, letterSpacing: -0.5 }}>{paso.titulo}</h1>
-          <p style={{ fontSize: 16, color: "#6B7280", lineHeight: 1.6, marginBottom: 32, maxWidth: 280 }}>{paso.texto}</p>
+          <Insignia tamano={116} colorFondo="rgba(14,159,110,0.12)" colorAcento={ACENTO}>
+            <paso.Icono size={52} color={ACENTO} strokeWidth={1.75} />
+          </Insignia>
+          <h1 style={{ fontSize: 27, fontWeight: 700, color: INK, marginBottom: 12, letterSpacing: -0.5 }}>{paso.titulo}</h1>
+          <p style={{ fontSize: 16, color: INK_SUAVE, lineHeight: 1.6, marginBottom: 32, maxWidth: 280 }}>{paso.texto}</p>
           <div style={{ display: "flex", gap: 8 }}>
             {pasos.map((_, i) => (
               <div key={i} style={{
                 height: 8, borderRadius: 4,
-                background: i === onboardingPaso ? "#0E9F6E" : "#E5E7EB",
+                background: i === onboardingPaso ? ACENTO : "#E4E4E0",
                 width: i === onboardingPaso ? 28 : 8,
                 transition: "all 0.3s"
               }} />
@@ -339,19 +347,19 @@ export default function Home() {
           {onboardingPaso < pasos.length - 1 ? (
             <button
               onClick={() => setOnboardingPaso(p => p + 1)}
-              style={{ background: "#0E9F6E", color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)" }}
+              style={{ background: ACENTO, color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)" }}
             >
               Siguiente
             </button>
           ) : (
             <button
               onClick={terminarOnboarding}
-              style={{ background: "#0E9F6E", color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)" }}
+              style={{ background: ACENTO, color: "#fff", border: "none", borderRadius: 16, padding: "20px", fontSize: 17, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)" }}
             >
               Empezar
             </button>
           )}
-          <button onClick={terminarOnboarding} style={{ background: "none", border: "none", color: "#9CA3AF", fontSize: 15, cursor: "pointer", padding: "10px" }}>
+          <button onClick={terminarOnboarding} style={{ background: "none", border: "none", color: "#8B929C", fontSize: 15, cursor: "pointer", padding: "10px" }}>
             Saltar
           </button>
         </div>
@@ -362,14 +370,14 @@ export default function Home() {
   // Pantalla: GPS no disponible o pendiente
   if (gpsPermiso === "pendiente") {
     return (
-      <main style={{ height: "100dvh", background: "#F8F9FA", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 32px", textAlign: "center" }}>
-        <div style={{ width: 96, height: 96, borderRadius: "50%", background: "rgba(14,159,110,0.08)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
-          <span style={{ fontSize: 44 }}>📍</span>
-        </div>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827", marginBottom: 12, letterSpacing: -0.5 }}>
+      <main style={{ height: "100dvh", background: "#FAFAF8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 32px", textAlign: "center" }}>
+        <Insignia tamano={100} colorFondo="rgba(14,159,110,0.1)" colorAcento={ACENTO}>
+          <IconoPin size={44} color={ACENTO} strokeWidth={1.75} />
+        </Insignia>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#14171A", marginBottom: 12, letterSpacing: -0.5 }}>
           Activá tu ubicación
         </h1>
-        <p style={{ fontSize: 16, color: "#6B7280", lineHeight: 1.6, marginBottom: 40, maxWidth: 280 }}>
+        <p style={{ fontSize: 16, color: "#5C6470", lineHeight: 1.6, marginBottom: 40, maxWidth: 280 }}>
           Mi Ruta necesita saber dónde estás para mostrarte los buses cercanos en tiempo real.
         </p>
         <button
@@ -390,14 +398,14 @@ export default function Home() {
   // Pantalla: GPS denegado
   if (gpsPermiso === "denegado") {
     return (
-      <main style={{ height: "100dvh", background: "#F8F9FA", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 32px", textAlign: "center" }}>
-        <div style={{ width: 96, height: 96, borderRadius: "50%", background: "rgba(239,68,68,0.08)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
-          <span style={{ fontSize: 44 }}>🚫</span>
-        </div>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827", marginBottom: 12, letterSpacing: -0.5 }}>
+      <main style={{ height: "100dvh", background: "#FAFAF8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 32px", textAlign: "center" }}>
+        <Insignia tamano={100} colorFondo="rgba(220,38,38,0.1)" colorAcento={PELIGRO}>
+          <IconoPinBloqueado size={44} color={PELIGRO} strokeWidth={1.75} />
+        </Insignia>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#14171A", marginBottom: 12, letterSpacing: -0.5 }}>
           Ubicación bloqueada
         </h1>
-        <p style={{ fontSize: 16, color: "#6B7280", lineHeight: 1.6, marginBottom: 40, maxWidth: 280 }}>
+        <p style={{ fontSize: 16, color: "#5C6470", lineHeight: 1.6, marginBottom: 40, maxWidth: 280 }}>
           Activá el permiso de ubicación en la configuración de tu navegador y recargá la página.
         </p>
         <button
@@ -419,7 +427,7 @@ export default function Home() {
     : []
 
   return (
-    <main style={{ height: "100dvh", background: "#F8F9FA", display: "flex", flexDirection: "column" }}>
+    <main style={{ height: "100dvh", background: "#FAFAF8", display: "flex", flexDirection: "column" }}>
 
       {/* Mapa */}
       <div style={{ flex: 1, position: "relative", minHeight: 0, borderRadius: "0 0 28px 28px", overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
@@ -436,21 +444,23 @@ export default function Home() {
             position: "absolute", top: 16, left: 68, right: 16, zIndex: 1000,
             background: "rgba(255,255,255,0.96)", backdropFilter: "blur(8px)",
             borderRadius: 14, padding: "12px 16px",
-            display: "flex", alignItems: "center",
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
             boxShadow: "0 2px 16px rgba(0,0,0,0.1)"
           }}>
-            <div style={{
-              width: 10, height: 10, borderRadius: "50%",
-              backgroundColor: "#0E9F6E",
-              animation: "pulso 1.5s ease-in-out infinite",
-              marginRight: 10, flexShrink: 0,
-            }} />
-            <span style={{ fontSize: 15, color: "#111827", fontWeight: 600 }}>
-              {reporteActivo.tipo === "en_bus" ? "Reportando" : "Esperando"} · {reporteActivo.rutaNombre}
-              {reporteActivo.tipo === "esperando" && reportesFiltrados.length === 0 && (
-                <span style={{ color: "#9CA3AF", fontSize: 13, fontWeight: 400 }}> · Sin actividad</span>
-              )}
+            <span style={{ fontSize: 15, color: "#14171A", fontWeight: 600, display: "flex", alignItems: "center" }}>
+              <span style={{
+                width: 10, height: 10, borderRadius: "50%",
+                backgroundColor: "#0E9F6E",
+                animation: "pulso 1.5s ease-in-out infinite",
+                marginRight: 10, flexShrink: 0,
+              }} />
+              {reporteActivo.tipo === "en_bus" ? "Viajando en la ruta" : "Esperando la ruta"}&nbsp;{reporteActivo.rutaNombre}
             </span>
+            {reporteActivo.tipo === "esperando" && reportesFiltrados.length === 0 && (
+              <span style={{ color: INK_SUAVE, fontSize: 12, fontWeight: 600, background: "#F0F0EE", padding: "4px 10px", borderRadius: 20, flexShrink: 0 }}>
+                Sin actividad
+              </span>
+            )}
           </div>
         )}
 
@@ -459,36 +469,46 @@ export default function Home() {
             position: "absolute", bottom: 24, left: 24, right: 24, zIndex: 1000,
             background: "#fff", borderRadius: 16, padding: "18px",
             textAlign: "center", boxShadow: "0 4px 24px rgba(0,0,0,0.12)",
-            animation: "fadeIn 0.2s ease"
+            animation: "fadeIn 0.2s ease",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
           }}>
-            <p style={{ color: "#111827", fontSize: 16, fontWeight: 700, margin: 0 }}>✅ Reporte publicado</p>
+            <IconoCheck size={22} color={ACENTO} strokeWidth={2.25} />
+            <p style={{ color: "#14171A", fontSize: 16, fontWeight: 700, margin: 0 }}>Reporte publicado</p>
           </div>
         )}
 
         {estadoReporte === "sin_conexion" && (
           <div style={{
             position: "absolute", bottom: 24, left: 24, right: 24, zIndex: 1000,
-            background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 16,
-            padding: "16px", textAlign: "center"
+            background: "rgba(220,38,38,0.06)", border: "1.5px solid rgba(220,38,38,0.25)", borderRadius: 16,
+            padding: "16px", textAlign: "center",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           }}>
+            <IconoAlerta size={20} color={PELIGRO} strokeWidth={2.25} />
             <p style={{ color: "#DC2626", fontSize: 15, fontWeight: 600, margin: 0 }}>Sin conexión. Tu reporte no está activo.</p>
           </div>
         )}
 
-        {/* NUEVO: aviso cuando el reporte está por vencer, con opción de extenderlo */}
+        {/* Aviso cuando el reporte está por vencer, con opción de extenderlo */}
         {estadoReporte === "activo" && reporteApuntoDeVencer && !confirmacionVisible && (
           <div style={{
             position: "absolute", bottom: 24, left: 24, right: 24, zIndex: 1000,
-            background: "#FFFBEB", border: "1.5px solid #FDE68A", borderRadius: 16,
+            background: "rgba(217,119,6,0.08)", border: "1.5px solid rgba(217,119,6,0.3)", borderRadius: 16,
             padding: "16px", textAlign: "center"
           }}>
-            <p style={{ color: "#92400E", fontSize: 15, fontWeight: 600, margin: "0 0 10px" }}>
-              Tu reporte vence en {Math.max(1, Math.ceil((tiempoRestante ?? 0) / 60000))} min
+            <p style={{
+              color: "#7C4A03", fontSize: 15, fontWeight: 600, margin: "0 0 10px",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            }}>
+              <IconoReloj size={18} color="#D97706" strokeWidth={2.25} />
+              <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                Tu reporte vence en {Math.max(1, Math.ceil((tiempoRestante ?? 0) / 60000))} min
+              </span>
             </p>
             <button
               onClick={refrescarReporte}
               style={{
-                background: "#F59E0B", color: "#fff", border: "none", borderRadius: 12,
+                background: "#D97706", color: "#fff", border: "none", borderRadius: 12,
                 padding: "10px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer",
               }}
             >
@@ -505,15 +525,16 @@ export default function Home() {
             <div style={{ display: "flex", gap: 12 }}>
               <button
                 onClick={cancelarReporte}
-                style={{ flex: 1, padding: "20px", borderRadius: 16, border: "1.5px solid #E5E7EB", background: "#fff", color: "#6B7280", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
+                style={{ flex: 1, padding: "20px", borderRadius: 16, border: "1.5px solid #E4E4E0", background: "#fff", color: "#5C6470", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
               >
                 Cancelar
               </button>
               <button
                 onClick={subirAlBus}
-                style={{ flex: 1, padding: "20px", borderRadius: 16, border: "none", background: "#0E9F6E", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)" }}
+                style={{ flex: 1, padding: "20px", borderRadius: 16, border: "none", background: "#0E9F6E", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(14,159,110,0.3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
               >
-                ✓ Ya subí
+                <IconoCheck size={18} color="#fff" strokeWidth={2.5} />
+                Ya subí
               </button>
             </div>
             {/* NUEVO */}
@@ -528,7 +549,7 @@ export default function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <button
               onClick={cancelarReporte}
-              style={{ width: "100%", padding: "20px", borderRadius: 16, border: "1.5px solid #E5E7EB", background: "#fff", color: "#6B7280", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
+              style={{ width: "100%", padding: "20px", borderRadius: 16, border: "1.5px solid #E4E4E0", background: "#fff", color: "#5C6470", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
             >
               Cancelar reporte
             </button>
@@ -585,12 +606,12 @@ export default function Home() {
             style={{ width: "100%", background: "#fff", borderRadius: "28px 28px 0 0", paddingBottom: 40, touchAction: "none" }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ width: 44, height: 5, background: "#E5E7EB", borderRadius: 3, margin: "16px auto 20px" }} />
+            <div style={{ width: 44, height: 5, background: "#E4E4E0", borderRadius: 3, margin: "16px auto 20px" }} />
 
-            <p style={{ textAlign: "center", fontSize: 22, color: "#111827", margin: "0 0 6px", fontWeight: 700, letterSpacing: -0.5 }}>
+            <p style={{ textAlign: "center", fontSize: 22, color: "#14171A", margin: "0 0 6px", fontWeight: 700, letterSpacing: -0.5 }}>
               {modoPicker === "cambiar" ? "¿A qué ruta cambiás?" : modo === "en_bus" ? "¿En qué bus vas?" : "¿Qué bus esperás?"}
             </p>
-            <p style={{ textAlign: "center", fontSize: 15, color: "#9CA3AF", margin: "0 0 16px", fontWeight: 400 }}>
+            <p style={{ textAlign: "center", fontSize: 15, color: "#8B929C", margin: "0 0 16px", fontWeight: 400 }}>
               Deslizá para seleccionar o escribí el número
             </p>
 
@@ -605,8 +626,8 @@ export default function Home() {
                 placeholder="Escribí el número de ruta"
                 style={{
                   width: "100%", padding: "14px 16px", borderRadius: 14,
-                  border: "1.5px solid #E5E7EB", fontSize: 16, textAlign: "center",
-                  color: "#111827", outline: "none", boxSizing: "border-box",
+                  border: "1.5px solid #E4E4E0", fontSize: 16, textAlign: "center",
+                  color: "#14171A", outline: "none", boxSizing: "border-box",
                 }}
               />
             </div>
@@ -660,8 +681,9 @@ export default function Home() {
                       <span style={{
                         fontSize: distancia === 0 ? 44 : 20,
                         fontWeight: 700,
-                        color: distancia === 0 ? "#0E9F6E" : "#9CA3AF",
+                        color: distancia === 0 ? "#0E9F6E" : "#8B929C",
                         letterSpacing: -1,
+                        fontVariantNumeric: "tabular-nums",
                         transition: "all 0.25s",
                       }}>
                         {ruta.id}
