@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mi Ruta
 
-## Getting Started
+PWA de transporte público para Managua. Los usuarios reportan si están "en el bus" o "esperando"
+una ruta, y ven en un mapa en tiempo real dónde está la actividad reciente de cada ruta.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router) + **React 19**, TypeScript
+- **Supabase** (Postgres + Realtime) como backend — tabla `reportes`, sin autenticación de usuarios
+- **Leaflet / react-leaflet** para el mapa
+- **Serwist** para el service worker (PWA instalable, `app/sw.ts` → `public/sw.js`)
+- **Tailwind CSS v4** (tokens de diseño en `app/globals.css`, ver `@theme`)
+
+## Desarrollo
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # Turbopack, service worker deshabilitado en dev
+npm run build    # Webpack — Serwist genera el service worker en el build de producción
+npm run start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`dev` usa `--turbopack` y `build` usa `--webpack` a propósito: Serwist necesita el pipeline de
+Webpack para generar `public/sw.js`, y el service worker está deshabilitado en desarrollo de
+todas formas (ver `next.config.ts`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Variables de entorno
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Requeridas en `.env.local` (el cliente de Supabase falla rápido si faltan, ver `lib/supabase.ts`):
 
-## Learn More
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+```
 
-To learn more about Next.js, take a look at the following resources:
+La anon key es pública por diseño (Supabase); la seguridad de escritura en la tabla `reportes`
+depende de las políticas de Row Level Security configuradas en el proyecto de Supabase, no en
+el cliente.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Estructura
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `app/page.tsx` — pantalla única de la app (onboarding, permisos de GPS, mapa, picker de rutas)
+- `components/` — `Boton`, `BannerFlotante`, `PantallaFrame` (marco responsive), `MapaLeaflet`,
+  `Iconos` (set de iconos SVG propios)
+- `lib/rutas.ts` — catálogo de rutas de bus; `lib/supabase.ts` — cliente de Supabase
 
-## Deploy on Vercel
+## Despliegue
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Desplegado en Vercel vía integración con GitHub (push a `master` dispara un deploy). Dominio de
+producción: `mi-ruta-sable.vercel.app`.
