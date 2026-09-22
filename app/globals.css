@@ -8,6 +8,13 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-ink: #14171A;
+  --color-ink-soft: #5C6470;
+  --color-surface: #FAFAF8;
+  --color-border: #E4E4E0;
+  --color-accent: #0E9F6E;
+  --color-warning: #D97706;
+  --color-danger: #DC2626;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -16,4 +23,60 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), -apple-system, sans-serif;
+}
+
+/* Marco tipo "teléfono" para viewports anchos (tablet/desktop) — la app es
+   de uso casi exclusivo en el celular; en pantallas grandes se centra en
+   vez de estirarse a lo ancho. */
+.marco-app {
+  min-height: 100dvh;
+  background: #E4E4E0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.marco-pantalla {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  background: #FAFAF8;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .marco-app {
+    padding: 32px;
+  }
+  .marco-pantalla {
+    max-width: 428px;
+    height: min(100dvh - 64px, 926px);
+    border-radius: 32px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+  }
+}
+
+/* Picker de rutas como <dialog> nativo: se resetea el estilo por defecto
+   del navegador para que se comporte como bottom sheet. */
+dialog.hoja-picker {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: none;
+  align-items: flex-end;
+}
+dialog.hoja-picker[open] {
+  display: flex;
+}
+dialog.hoja-picker::backdrop {
+  background: rgba(0,0,0,0.5);
 }
