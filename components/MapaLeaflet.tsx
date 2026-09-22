@@ -15,8 +15,7 @@ type Props = {
 
 const MANAGUA = { lat: 12.1328, lng: -86.2904 }
 
-// NUEVO: límites aproximados del área metropolitana de Managua.
-// AJUSTAR después de probar en el mapa real — esto es una primera estimación.
+// Límites aproximados del área metropolitana de Managua (evita alejar el mapa fuera de la ciudad).
 const LIMITES_MANAGUA: [[number, number], [number, number]] = [
   [11.98, -86.45], // esquina suroeste
   [12.28, -86.10], // esquina noreste
@@ -32,11 +31,11 @@ function CentrarMapa({ pos }: { pos: { lat: number; lng: number } | null }) {
 
 export default function MapaLeaflet({ reportes, rutaSeleccionadaId, miPosicion, reporteActivo }: Props) {
   useEffect(() => {
-    delete (L.Icon.Default.prototype as any)._getIconUrl
+    delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl
     L.Icon.Default.mergeOptions({
-      iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      iconRetinaUrl: "/leaflet/marker-icon-2x.png",
+      iconUrl: "/leaflet/marker-icon.png",
+      shadowUrl: "/leaflet/marker-shadow.png",
     })
   }, [])
 
